@@ -34,34 +34,7 @@ def index():
     return render_template('index.html')
 
 
-def video_stream():
-    prototxt = "deploy.prototxt.txt"
-    model = "res10_300x300_ssd_iter_140000.caffemodel"
-    confidence = 0.5
-
-    # load our serialized model from disk
-    print("[INFO] loading model...")
-    net = cv2.dnn.readNetFromCaffe(prototxt, model)
-
-    # initialize the input queue (frames), output queue (detections),
-    # and the list of actual detections returned by the child process
-    input_queue = Queue(maxsize=1)
-    output_queue = Queue(maxsize=1)
-    detections = None
-
-    # construct a child process *indepedent* from our main process of
-    # execution
-    print("[INFO] starting process...")
-    p = Process(target=classify_frame, args=(net, input_queue, output_queue,))
-    p.daemon = True
-    p.start()
-
-    print("[INFO] starting video stream...")
-    # vs = VideoStream(src=0).start()
-    # vs = VideoStream(usePiCamera=True).start()
-    vc = cv2.VideoCapture(0)
-    time.sleep(2.0)
-
+def video_stream(vc, input_queue, output_queue, detections):
     while True:
         # image = vs.read()
         _, image = vc.read()
@@ -106,9 +79,35 @@ def video_stream():
 
 @app.route('/video_viewer')
 def video_viewer():
-    return Response(video_stream(),
+    return Response(video_stream(vc, input_queue, output_queue, detections),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == '__main__':
+    prototxt = "deploy.prototxt.txt"
+    model = "res10_300x300_ssd_iter_140000.caffemodel"
+    confidence = 0.5
+
+    # load our serialized model from disk
+    print("[INFO] loading model...")
+    net = cv2.dnn.readNetFromCaffe(prototxt, model)
+
+    # initialize the input queue (frames), output queue (detections),
+    # and the list of actual detections returned by the child process
+    input_queue = Queue(maxsize=1)
+    output_queue = Queue(maxsize=1)
+    detections = None
+
+    # construct a child process *indepedent* from our main process of
+    # execution
+    print("[INFO] starting process...")
+    p = Process(target=classify_frame, args=(net, input_queue, output_queue,))
+    p.daemon = True
+    p.start()
+
+    print("[INFO] starting video stream...")
+    # vs = VideoStream(src=0).start()
+    # vs = VideoStream(usePiCamera=True).start()
+    vc = cv2.VideoCapture(0)
+    time.sleep(2.0)
     app.run(host='0.0.0.0', threaded=True)
