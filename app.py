@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, request, jsonify
 # from imutils.video import VideoStream
 # import imutils
 import numpy as np
@@ -77,10 +77,27 @@ def video_stream(vc, input_queue, output_queue, detections):
                b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
 
 
-@app.route('/video_viewer')
+@app.route('/video_viewer', methods=['GET', 'POST'])
 def video_viewer():
-    return Response(video_stream(vc, input_queue, output_queue, detections),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    global p
+    if request.method == 'POST':
+        json = request.get_json()
+        mode = json['mode']
+        if mode == "on":
+            if p is None or not p.is_alive():
+                # construct a child process *indepedent* from our main process of execution
+                print("[INFO] starting process...")
+                p = Process(target=classify_frame, args=(net, input_queue, output_queue,))
+                p.daemon = True
+                p.start()
+            return Response(video_stream(vc, input_queue, output_queue, detections),
+                            mimetype='multipart/x-mixed-replace; boundary=frame')
+        else:
+            p.terminate()
+            return '', 204
+    else:
+        return Response(video_stream(vc, input_queue, output_queue, detections),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == '__main__':
@@ -97,17 +114,12 @@ if __name__ == '__main__':
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)
     detections = None
-
-    # construct a child process *indepedent* from our main process of
-    # execution
-    print("[INFO] starting process...")
-    p = Process(target=classify_frame, args=(net, input_queue, output_queue,))
-    p.daemon = True
-    p.start()
+    p = None
 
     print("[INFO] starting video stream...")
     # vs = VideoStream(src=0).start()
     # vs = VideoStream(usePiCamera=True).start()
     vc = cv2.VideoCapture(0)
     time.sleep(2.0)
-    app.run(host='0.0.0.0', threaded=True)
+    app.run(host='0.0.0.0')
+    input("Press Enter to Continue...")

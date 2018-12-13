@@ -1,9 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Streaming Video Recorder</title>
+    <title>Video streaming with face detection</title>
+    <script>
+        function onModeButtonClick() {
+            var button = document.getElementById("mode");
+            var video = document.getElementById("video");
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/video_viewer");
+            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+            if (button.value == "Start") {
+                xhr.send(JSON.stringify({ mode: "on" }));
+                button.value = "Stop";
+                video.style.display = "inline-block";
+            } else {
+                xhr.send(JSON.stringify({ mode: "off" }));
+                button.value = "Start";
+                video.style.display = "none";
+            }
+        }
+    </script>
 </head>
-<body>
-  <img id="video" src="{{ url_for('video_viewer') }}">
-</body>
+    <body>
+        <input type="button" value="Start" id="mode" onclick="onModeButtonClick();"/>
+        <img id="video" src="{{ url_for('video_viewer') }}" style="display: none;" >
+    </body>
 </html>
