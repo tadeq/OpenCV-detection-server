@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response, request, jsonify
+from flask import Flask, render_template, Response, request
 from imutils.video import VideoStream
 import imutils
 import numpy as np
@@ -51,32 +51,26 @@ def index():
     return render_template('index.html')
 
 
-def video_stream(cam, input_queue, output_queue, detections):
+def process_frame(cam, input_queue, output_queue, detections):
     while True:
         if pi:
-            image = cam.read()
+            frame = cam.read()
         else:
-            _, image = cam.read()
+            _, frame = cam.read()
         # load the input image and construct an input blob for the image
         # by resizing to a fixed 300x300 pixels and then normalizing it
-        (h, w) = image.shape[:2]
+        (h, w) = frame.shape[:2]
 
-        # if the input queue *is* empty, give the current frame to
-        # classify
         if input_queue.empty():
-            input_queue.put(image)
+            input_queue.put(frame)
 
-        # if the output queue *is not* empty, grab the detections
         if not output_queue.empty():
             detections = output_queue.get()
-        # check to see if our detectios are not None (and if so, we'll
-        # draw the detections on the frame)
+
         if detections is not None:
             if network:
-                # loop over the detections
                 for i in range(0, detections.shape[2]):
-                    # extract the confidence (i.e., probability) associated with the
-                    # prediction
+                    # extract the confidence (i.e., probability) associated with the prediction
                     frame_confidence = detections[0, 0, i, 2]
 
                     # filter out weak detections by ensuring the `confidence` is
@@ -87,13 +81,12 @@ def video_stream(cam, input_queue, output_queue, detections):
                         (startX, startY, endX, endY) = box.astype("int")
 
                         # draw the bounding box of the face
-                        cv2.rectangle(image, (startX, startY), (endX, endY),
-                                      (0, 0, 255), 2)
+                        cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 0, 255), 2)
             else:
                 for (x, y, w, h) in detections:
-                    cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-        _, jpeg_frame = cv2.imencode('.jpg', image)
+        _, jpeg_frame = cv2.imencode('.jpg', frame)
         bytes_frame = jpeg_frame.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
@@ -115,23 +108,14 @@ def video_viewer():
                     p = Process(target=classify_frame_haar, args=(input_queue, output_queue,))
                 p.daemon = True
                 p.start()
-            if pi:
-                return Response(video_stream(vs, input_queue, output_queue, detections),
-                                mimetype='multipart/x-mixed-replace; boundary=frame')
-            else:
-                return Response(video_stream(vc, input_queue, output_queue, detections),
-                                mimetype='multipart/x-mixed-replace; boundary=frame')
-
+            return Response(process_frame(video_stream, input_queue, output_queue, detections),
+                            mimetype='multipart/x-mixed-replace; boundary=frame')
         else:
             p.terminate()
             return '', 204
     else:
-        if pi:
-            return Response(video_stream(vs, input_queue, output_queue, detections),
-                            mimetype='multipart/x-mixed-replace; boundary=frame')
-        else:
-            return Response(video_stream(vc, input_queue, output_queue, detections),
-                            mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(process_frame(video_stream, input_queue, output_queue, detections),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == '__main__':
@@ -139,24 +123,17 @@ if __name__ == '__main__':
     model = "res10_300x300_ssd_iter_140000.caffemodel"
     confidence = 0.5
 
-    # load our serialized model from disk
-    print("[INFO] loading model...")
     if network:
         net = cv2.dnn.readNetFromCaffe(prototxt, model)
     else:
         face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
-    # initialize the input queue (frames), output queue (detections),
-    # and the list of actual detections returned by the child process
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)
     detections = None
     p = None
 
     print("[INFO] starting video stream...")
-    if pi:
-        vs = VideoStream(src=0).start()
-    else:
-        vc = cv2.VideoCapture(0)
+    video_stream = VideoStream(src=0).start() if pi else cv2.VideoCapture(0)
     time.sleep(2.0)
     app.run(host='0.0.0.0')
