@@ -54,13 +54,10 @@ def draw_area(cam, rectangle):
         if frame is not None:  
             
             if not rectangle.empty():                
-                squareVal = rectangle.get()
-                rectangle.put(squareVal)
-                pixelFromX = squareVal[0]
-                pixelFromY = squareVal[1]
-                width = squareVal[2]
-                height = squareVal[3]                
-                cv2.rectangle(frame, (pixelFromX, pixelFromY), (pixelFromX + width, pixelFromY + height), (0, 255, 0), 2)  
+                rectV = rectangle.get() #rectV-current value of the rectangle
+                rectangle.put(rectV)   
+                #rectV[0]==pixelFromX; rectV[1]==pixelFromY; rectV[2]==width; rectV[3]==height            
+                cv2.rectangle(frame, (rectV[0], rectV[1]), (rectV[0] + rectV[2], rectV[1] + rectV[3]  ), (0, 255, 0), 2)  
           
             _, jpeg_frame = cv2.imencode('.jpg', frame)
             bytes_frame = jpeg_frame.tobytes()
@@ -102,13 +99,10 @@ def classify_frame(input_queue, output_queue, rectangle):
             frame = input_queue.get()
             if frame is not None:
                 if not rectangle.empty():
-                    squareVal = rectangle.get()
-                    rectangle.put(squareVal)
-                    pixelFromX = squareVal[0]
-                    pixelFromY = squareVal[1]
-                    width = squareVal[2]
-                    height = squareVal[3]  
-                    frame = frame[pixelFromX:pixelFromX+width,pixelFromY:pixelFromY+height]
+                    rectV = rectangle.get() #rectV-current value of the rectangle
+                    rectangle.put(rectV) 
+                    #rectV[0]==pixelFromX; rectV[1]==pixelFromY; rectV[2]==width; rectV[3]==height  
+                    frame = frame[rectV[0]:rectV[0]+rectV[2],rectV[1]:rectV[1]+rectV[3] ]
                 # resize the frame, convert it to grayscale, and blur it
                 #frame = imutils.resize(frame, width=500)
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -150,13 +144,10 @@ def process_frame(cam, input_queue, output_queue, detections, rectangle):
                 detections = output_queue.get()
             
             if not rectangle.empty():                
-                squareVal = rectangle.get()
-                rectangle.put(squareVal)
-                pixelFromX = squareVal[0]
-                pixelFromY = squareVal[1]
-                width = squareVal[2]
-                height = squareVal[3]                
-                cv2.rectangle(frame, (pixelFromX, pixelFromY), (pixelFromX + width, pixelFromY + height), (0, 0, 255), 2) 
+                rectV = rectangle.get() #rectV-current value of the rectangle
+                rectangle.put(rectV)
+                #rectV[0]==pixelFromX; rectV[1]==pixelFromY; rectV[2]==width; rectV[3]==height
+                cv2.rectangle(frame, (rectV[0], rectV[1]), (rectV[0] + rectV[2], rectV[1] + rectV[3] ), (0, 0, 255), 2) 
             
             if detections is not None:
                 for d in detections:
@@ -164,9 +155,9 @@ def process_frame(cam, input_queue, output_queue, detections, rectangle):
                         # compute the bounding box for the contour, draw it on the frame
                         (x, y, w, h) = cv2.boundingRect(d)
                         if not rectangle.empty():
-                            squareVal = rectangle.get()
-                            rectangle.put(squareVal)
-                            cv2.rectangle(frame, (x+squareVal[0], y+squareVal[1]), (x + int(w), y + int(h)), (0, 255, 0), 2)
+                            rectVal = rectangle.get()
+                            rectangle.put(rectVal)
+                            cv2.rectangle(frame, (x+rectVal[0], y+rectVal[1]), (x + int(w), y + int(h)), (0, 255, 0), 2)
                         else:    
                             cv2.rectangle(frame, (x, y), (x + int(w), y + int(h)), (0, 255, 0), 2)
             
