@@ -13,11 +13,12 @@ app = Flask(__name__)
 pi = False
 
 # detect with neural network or with haar cascades
-network = False
+network = True
 
 
 def classify_frame_haar(input_queue, output_queue):
-    while True:
+    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    while True:        
         # check to see if there is a frame in our input queue
         if not input_queue.empty():
             frame = input_queue.get()
@@ -27,8 +28,11 @@ def classify_frame_haar(input_queue, output_queue):
             output_queue.put(detections)
 
 
-def classify_frame_net(net, input_queue, output_queue):
-    while True:
+def classify_frame_net(input_queue, output_queue):
+    prototxt = "deploy.prototxt.txt"
+    model = "res10_300x300_ssd_iter_140000.caffemodel"
+    net = cv2.dnn.readNetFromCaffe(prototxt, model)
+    while True:        
         # check to see if there is a frame in our input queue
         if not input_queue.empty():
             frame = input_queue.get()
@@ -103,7 +107,7 @@ def video_viewer():
                 # construct a child process *indepedent* from our main process of execution
                 print("[INFO] starting process...")
                 if network:
-                    p = Process(target=classify_frame_net, args=(net, input_queue, output_queue,))
+                    p = Process(target=classify_frame_net, args=(input_queue, output_queue,))
                 else:
                     p = Process(target=classify_frame_haar, args=(input_queue, output_queue,))
                 p.daemon = True
@@ -119,14 +123,7 @@ def video_viewer():
 
 
 if __name__ == '__main__':
-    prototxt = "deploy.prototxt.txt"
-    model = "res10_300x300_ssd_iter_140000.caffemodel"
     confidence = 0.5
-
-    if network:
-        net = cv2.dnn.readNetFromCaffe(prototxt, model)
-    else:
-        face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)
