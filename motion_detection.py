@@ -15,16 +15,95 @@ pi = False
 # detect with neural network or with haar cascades
 network = False
 
-def classify_frame(input_queue, output_queue, square):
+@app.route('/')
+def index():
+    return render_template('welcome_page.html')
+
+@app.route('/configure', methods=['GET', 'POST'])
+def configure():
+    return render_template('configure.html')
+
+@app.route('/video_viewer_conf', methods=['GET', 'POST'])
+def video_viewer_conf():    
+    if request.method == 'POST':
+        global rectangle
+        json = request.get_json()
+        pixelFromX = int(json['pixelFromX'])
+        pixelFromY = int(json['pixelFromY'])
+        width = int(json['width'])
+        height = int(json['height']) 
+        if not rectangle.empty():
+            rectangle.get()
+        rectangle.put([pixelFromX, pixelFromY, width, height])
+        return Response()
+    else:
+        return Response(draw_area(video_stream, rectangle),mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def draw_area(cam, rectangle):
+    while True:   
+        frame = None    
+        try:
+            if pi:
+                frame = cam.read()
+            else:
+                _, frame = cam.read()                
+        except:                
+            #One frame wasn't read properly            
+            pass
+        
+        if frame is not None:  
+            
+            if not rectangle.empty():                
+                squareVal = rectangle.get()
+                rectangle.put(squareVal)
+                pixelFromX = squareVal[0]
+                pixelFromY = squareVal[1]
+                width = squareVal[2]
+                height = squareVal[3]                
+                cv2.rectangle(frame, (pixelFromX, pixelFromY), (pixelFromX + width, pixelFromY + height), (0, 255, 0), 2)  
+          
+            _, jpeg_frame = cv2.imencode('.jpg', frame)
+            bytes_frame = jpeg_frame.tobytes()
+            yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
+
+@app.route('/surveillance')
+def surveillance():
+    return render_template('surveillance.html')
+
+@app.route('/video_viewer', methods=['GET', 'POST'])
+def video_viewer():
+    global p
+    global rectangle
+    if request.method == 'POST':
+        json = request.get_json()
+        mode = json['mode']
+        if mode == "on":
+            if p is None or not p.is_alive():
+                print("[INFO] starting process...")
+                time.sleep(0.5)
+                p = Process(target=classify_frame, args=(input_queue, output_queue,rectangle,))
+                p.daemon = True
+                p.start()
+            return Response(process_frame(video_stream, input_queue, output_queue, detections, rectangle),
+                            mimetype='multipart/x-mixed-replace; boundary=frame')
+        else:
+            p.terminate()
+            return '', 204
+    else:        
+        return Response(process_frame(video_stream, input_queue, output_queue, detections, rectangle),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def classify_frame(input_queue, output_queue, rectangle):
     first_frame = None
     while True:
         # check to see if there is a frame in our input queue
         if not input_queue.empty():
             frame = input_queue.get()
             if frame is not None:
-                if not square.empty():
-                    squareVal = square.get()
-                    square.put(squareVal)
+                if not rectangle.empty():
+                    squareVal = rectangle.get()
+                    rectangle.put(squareVal)
                     pixelFromX = squareVal[0]
                     pixelFromY = squareVal[1]
                     width = squareVal[2]
@@ -51,20 +130,7 @@ def classify_frame(input_queue, output_queue, square):
                 detections = imutils.grab_contours(detections)
                 output_queue.put(detections)
 
-
-@app.route('/')
-def index():
-    return render_template('welcome_page.html')
-
-@app.route('/configure', methods=['GET', 'POST'])
-def configure():
-    return render_template('configure.html')
-
-@app.route('/surveillance')
-def surveillance():
-    return render_template('surveillance.html')
-
-def process_frame(cam, input_queue, output_queue, detections, square):
+def process_frame(cam, input_queue, output_queue, detections, rectangle):
     while True:        
         try:
             if pi:
@@ -83,9 +149,9 @@ def process_frame(cam, input_queue, output_queue, detections, square):
             if not output_queue.empty():
                 detections = output_queue.get()
             
-            if not square.empty():                
-                squareVal = square.get()
-                square.put(squareVal)
+            if not rectangle.empty():                
+                squareVal = rectangle.get()
+                rectangle.put(squareVal)
                 pixelFromX = squareVal[0]
                 pixelFromY = squareVal[1]
                 width = squareVal[2]
@@ -97,9 +163,9 @@ def process_frame(cam, input_queue, output_queue, detections, square):
                     #if cv2.contourArea(d) > 500:
                         # compute the bounding box for the contour, draw it on the frame
                         (x, y, w, h) = cv2.boundingRect(d)
-                        if not square.empty():
-                            squareVal = square.get()
-                            square.put(squareVal)
+                        if not rectangle.empty():
+                            squareVal = rectangle.get()
+                            rectangle.put(squareVal)
                             cv2.rectangle(frame, (x+squareVal[0], y+squareVal[1]), (x + int(w), y + int(h)), (0, 255, 0), 2)
                         else:    
                             cv2.rectangle(frame, (x, y), (x + int(w), y + int(h)), (0, 255, 0), 2)
@@ -109,85 +175,13 @@ def process_frame(cam, input_queue, output_queue, detections, square):
             yield (b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
 
-def draw_area(cam, square):
-    while True:   
-        frame = None    
-        try:
-            if pi:
-                frame = cam.read()
-            else:
-                _, frame = cam.read()                
-        except:                
-            #One frame wasn't read properly            
-            pass
-        
-        if frame is not None:  
-            
-            if not square.empty():                
-                squareVal = square.get()
-                square.put(squareVal)
-                pixelFromX = squareVal[0]
-                pixelFromY = squareVal[1]
-                width = squareVal[2]
-                height = squareVal[3]                
-                cv2.rectangle(frame, (pixelFromX, pixelFromY), (pixelFromX + width, pixelFromY + height), (0, 255, 0), 2)  
-          
-            _, jpeg_frame = cv2.imencode('.jpg', frame)
-            bytes_frame = jpeg_frame.tobytes()
-            yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
-
-
-
-@app.route('/video_viewer', methods=['GET', 'POST'])
-def video_viewer():
-    global p
-    global square
-    if request.method == 'POST':
-        json = request.get_json()
-        mode = json['mode']
-        if mode == "on":
-            if p is None or not p.is_alive():
-                print("[INFO] starting process...")
-                time.sleep(0.5)
-                p = Process(target=classify_frame, args=(input_queue, output_queue,square,))
-                p.daemon = True
-                p.start()
-            return Response(process_frame(video_stream, input_queue, output_queue, detections, square),
-                            mimetype='multipart/x-mixed-replace; boundary=frame')
-        else:
-            p.terminate()
-            return '', 204
-    else:        
-        return Response(process_frame(video_stream, input_queue, output_queue, detections, square),
-                        mimetype='multipart/x-mixed-replace; boundary=frame')
-    
-
-
-@app.route('/video_viewer_conf', methods=['GET', 'POST'])
-def video_viewer_conf():    
-    if request.method == 'POST':
-        global square
-        json = request.get_json()
-        pixelFromX = int(json['pixelFromX'])
-        pixelFromY = int(json['pixelFromY'])
-        width = int(json['width'])
-        height = int(json['height']) 
-        if not square.empty():
-            square.get()
-        square.put([pixelFromX, pixelFromY, width, height])
-        return Response()
-    else:
-        return Response(draw_area(video_stream, square),mimetype='multipart/x-mixed-replace; boundary=frame')
-        
-
-
 if __name__ == '__main__':
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)    
     detections = None
     p = None
-    square = Queue(maxsize=1)
+    rectangle = Queue(maxsize=1)
+    rectangle.put([0, 0, 0, 0])
 
     print("[INFO] starting video stream...")
     video_stream = VideoStream(src=0).start() if pi else cv2.VideoCapture(0)
