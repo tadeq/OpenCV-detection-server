@@ -3,31 +3,31 @@
 <head>
     <title>Live video stream</title>
     <script>
-        function onOKButtonClick(pixelFromX, pixelFromY, width, height) {            
+        function onSaveButtonClick() {
             var fieldFromX = document.getElementById("pixelFromX");
             var fieldFromY = document.getElementById("pixelFromY");
             var width = document.getElementById("width");
             var height = document.getElementById("height");
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/video_viewer_conf");
-            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");   
-            xhr.send(JSON.stringify({ 
+            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+            xhr.send(JSON.stringify({
                     pixelFromX: fieldFromX.value,
                     pixelFromY: fieldFromY.value,
                     width: width.value,
                     height: height.value
-                }));                        
+                }));
         }
         function onResetConf() {
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "/video_viewer_conf");
-            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");   
-            xhr.send(JSON.stringify({ 
+            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+            xhr.send(JSON.stringify({
                     pixelFromX: 0,
                     pixelFromY: 0,
                     width: 0,
                     height: 0
-                })); 
+                }));
             location.href='/configure';
         }
     </script>
@@ -37,14 +37,14 @@
         <h1>Configuration</h1>
         <p>Please select watching area</p>
         </center>
-        <center><img src="/static/instr.jpg"></img></center>
-        <center>(x,y)</center>
-        <center><input type="number" id="pixelFromX" /><input type="number" id="pixelFromY" /></center>
-        <center>(width, height)</center>
-        <center><input type="number" id="width" /><input type="number" id="height" /></center>
-        <center><input type="button" value="OK" id="ok" onclick="onOKButtonClick();"/></center>
-        <center><input type="button" value="System start" id="mode" onclick="location.href='/surveillance';"/></center>
-        <center><img id="video" src="{{ url_for('video_viewer_conf') }}" style="display: inline-block;" ></center>        
-        <center><input type="button" value="Reset Configuration" id="mode" onclick="onResetConf();"/></center>
+        <center><img src="/static/instr.jpg"/>
+        (x,y)<br/>
+        <input type="number" id="pixelFromX" /><input type="number" id="pixelFromY" /><br/>
+        (width, height)<br/>
+        <input type="number" id="width" /><input type="number" id="height" /><br/>
+        <input type="button" value="Save detection area" id="ok" onclick="onSaveButtonClick();"/><br/>
+        <input type="button" value="System start" id="mode" onclick="location.href='/surveillance';"/><br/>
+        <img id="video" src="{{ url_for('video_viewer_conf') }}" style="display: inline-block;" ><br/>
+        <input type="button" value="Reset Configuration" id="mode" onclick="onResetConf();"/></center>
     </body>
 </html>

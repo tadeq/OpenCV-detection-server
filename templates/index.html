@@ -19,11 +19,25 @@
                 video.style.display = "none";
             }
         }
+        function onBackButtonClick() {
+            var button = document.getElementById("mode");
+            if (button.value == "Stop") {
+                xhr.open("POST", "/video_viewer");
+                xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+                xhr.send(JSON.stringify({mode: "off"}));
+                button.value = "Start";
+                video.style.display = "none";
+            }
+            location.href='/configure';
+        }
     </script>
 </head>
     <body>
-        <input type="button" value="Start" id="mode" onclick="onModeButtonClick();"/>
-        <br/>
-        <img id="video" src="{{ url_for('video_viewer') }}" style="display: none;" >
+        <center><input type="button" style="height:70px;width:200px" value="Start" id="mode" onclick="onModeButtonClick();"/>
+            <br/>
+            <img id="video" src="{{ url_for('video_viewer') }}" style="display: inline-block;" >
+            <br/>
+            <input type="button" style="height:70px;width:200px" value="Back" id="back" onclick="onBackButtonClick();"/>
+            </center>
     </body>
 </html>
