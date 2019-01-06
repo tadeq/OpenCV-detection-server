@@ -116,7 +116,7 @@ def classify_frame(input_queue, output_queue, rectangle):
                     continue
                 # compute the absolute difference between the current frame and first frame
                 frame_delta = cv2.absdiff(first_frame, gray)
-                thresh = cv2.threshold(frame_delta, 50, 255, cv2.THRESH_BINARY)[1]
+                thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
 
                 # dilate the thresholded image to fill in holes, then find contours on thresholded image
                 thresh = cv2.dilate(thresh, None, iterations=2)
@@ -157,9 +157,9 @@ def process_frame(cam, input_queue, output_queue, detections, rectangle):
                         if not rectangle.empty():
                             rectVal = rectangle.get()
                             rectangle.put(rectVal)
-                            cv2.rectangle(frame, (x+rectVal[0], y+rectVal[1]), (x + int(w), y + int(h)), (0, 255, 0), 2)
-                        else:    
-                            cv2.rectangle(frame, (x, y), (x + int(w), y + int(h)), (0, 255, 0), 2)
+                            cv2.rectangle(frame, (x+rectVal[0], y+rectVal[1]), (x+rectVal[0] + w, y+rectVal[0] + h), (0, 255, 0), 2)
+                        #else:    
+                            #cv2.rectangle(frame, (x, y), (x - int(w), y - int(h)), (0, 255, 0), 2)
             
             _, jpeg_frame = cv2.imencode('.jpg', frame)
             bytes_frame = jpeg_frame.tobytes()

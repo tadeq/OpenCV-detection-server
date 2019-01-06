@@ -19,13 +19,11 @@
                 video.style.display = "none";
             }
         }
-        function onResetButtonClick() {
-            location.href='/video_viewer';
-        }
     </script>
 </head>
     <body>            
         <center><input type="button" style="height:70px;width:200px" value="Start" id="mode" onclick="onModeButtonClick();"/></center>
-        <center><img id="video" src="{{ url_for('video_viewer') }}" style="display: inline-block;" ></center>
+        <center><img id="video" src="{{ url_for('video_viewer') }}" style="display: inline-block;" ></center>        
+        </audio>
     </body>
 </html>
