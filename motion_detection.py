@@ -79,18 +79,17 @@ def draw_area(cam):
         else:
             _, frame = cam.read()
 
-        if frame is not None:
-            if not rectangle.empty():
-                det_area = rectangle.get()  # det_area-current value of the rectangle
-                rectangle.put(det_area)
-                # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
-                cv2.rectangle(frame, (det_area[0], det_area[1]), (det_area[0] + det_area[2], det_area[1] + det_area[3]),
-                              (0, 255, 0), 2)
+        if not rectangle.empty():
+            det_area = rectangle.get()  # det_area-current value of the rectangle
+            rectangle.put(det_area)
+            # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
+            cv2.rectangle(frame, (det_area[0], det_area[1]), (det_area[0] + det_area[2], det_area[1] + det_area[3]),
+                          (0, 255, 0), 2)
 
-            _, jpeg_frame = cv2.imencode('.jpg', frame)
-            bytes_frame = jpeg_frame.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
+        _, jpeg_frame = cv2.imencode('.jpg', frame)
+        bytes_frame = jpeg_frame.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
 
 
 def classify_frame():
@@ -100,32 +99,30 @@ def classify_frame():
         if not input_queue.empty():
             frame = input_queue.get()
 
-            if frame is not None:
-                if not rectangle.empty():
-                    det_area = rectangle.get()  # det_area-current value of the rectangle
-                    rectangle.put(det_area)
-                    # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
-                    frame = frame[det_area[0]:det_area[0] + det_area[2], det_area[1]:det_area[1] + det_area[3]]
-                # resize the frame, convert it to grayscale, and blur it
-                # frame = imutils.resize(frame, width=500)
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                gray = cv2.GaussianBlur(gray, (21, 21), 0)
+            if not rectangle.empty():
+                det_area = rectangle.get()  # det_area-current value of the rectangle
+                rectangle.put(det_area)
+                # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
+                frame = frame[det_area[0]:det_area[0] + det_area[2], det_area[1]:det_area[1] + det_area[3]]
+            # resize the frame, convert it to grayscale, and blur it
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
-                # if the first frame is None, initialize it
-                if first_frame is None:
-                    first_frame = gray
-                    continue
-                if len(frame) != len(first_frame):
-                    continue
-                # compute the absolute difference between the current frame and first frame
-                frame_delta = cv2.absdiff(first_frame, gray)
-                thresh = cv2.threshold(frame_delta, 50, 255, cv2.THRESH_BINARY)[1]
+            # if the first frame is None, initialize it
+            if first_frame is None:
+                first_frame = gray
+                continue
+            if len(frame) != len(first_frame):
+                continue
+            # compute the absolute difference between the current frame and first frame
+            frame_delta = cv2.absdiff(first_frame, gray)
+            thresh = cv2.threshold(frame_delta, 50, 255, cv2.THRESH_BINARY)[1]
 
-                # dilate the thresholded image to fill in holes, then find contours on thresholded image
-                thresh = cv2.dilate(thresh, None, iterations=2)
-                detections = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                detections = imutils.grab_contours(detections)
-                output_queue.put(detections)
+            # dilate the thresholded image to fill in holes, then find contours on thresholded image
+            thresh = cv2.dilate(thresh, None, iterations=2)
+            detections = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            detections = imutils.grab_contours(detections)
+            output_queue.put(detections)
 
 
 def process_frame(cam):
@@ -136,36 +133,34 @@ def process_frame(cam):
         else:
             _, frame = cam.read()
 
-        if frame is not None:
+        if input_queue.empty():
+            input_queue.put(frame)
 
-            if input_queue.empty():
-                input_queue.put(frame)
+        if not output_queue.empty():
+            detections = output_queue.get()
 
-            if not output_queue.empty():
-                detections = output_queue.get()
+        if not rectangle.empty():
+            det_area = rectangle.get()  # det_area-current value of the rectangle
+            rectangle.put(det_area)
+            # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
+            cv2.rectangle(frame, (det_area[0], det_area[1]), (det_area[0] + det_area[2], det_area[1] + det_area[3]),
+                          (0, 0, 255), 2)
 
-            if not rectangle.empty():
-                det_area = rectangle.get()  # det_area-current value of the rectangle
-                rectangle.put(det_area)
-                # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
-                cv2.rectangle(frame, (det_area[0], det_area[1]), (det_area[0] + det_area[2], det_area[1] + det_area[3]),
-                              (0, 0, 255), 2)
+        if detections is not None:
+            for d in detections:
+                # if cv2.contourArea(d) > 360:
+                # compute the bounding box for the contour, draw it on the frame
+                (x, y, w, h) = cv2.boundingRect(d)
+                if not rectangle.empty():
+                    rect = rectangle.get()
+                    rectangle.put(rect)
+                    cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + w, y + h),
+                                  (0, 255, 0), 2)
 
-            if detections is not None:
-                for d in detections:
-                    # if cv2.contourArea(d) > 360:
-                    # compute the bounding box for the contour, draw it on the frame
-                    (x, y, w, h) = cv2.boundingRect(d)
-                    if not rectangle.empty():
-                        rect = rectangle.get()
-                        rectangle.put(rect)
-                        cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + rect[0] + w, y + rect[1] + h),
-                                      (0, 255, 0), 2)
-
-            _, jpeg_frame = cv2.imencode('.jpg', frame)
-            bytes_frame = jpeg_frame.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
+        _, jpeg_frame = cv2.imencode('.jpg', frame)
+        bytes_frame = jpeg_frame.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + bytes_frame + b'\r\n\r\n')
 
 
 if __name__ == '__main__':
