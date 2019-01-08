@@ -5,11 +5,12 @@ import cv2
 from multiprocessing import Process
 from multiprocessing import Queue
 import time
+import RPi.GPIO as GPIO
 
 app = Flask(__name__)
 
 # run with raspberry pi usb camera or with built-in laptop webcam
-pi = False
+pi = True
 
 
 @app.route('/')
@@ -103,7 +104,7 @@ def classify_frame():
                 det_area = rectangle.get()  # det_area-current value of the rectangle
                 rectangle.put(det_area)
                 # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
-                frame = frame[det_area[0]:det_area[0] + det_area[2], det_area[1]:det_area[1] + det_area[3]]
+                frame = frame[det_area[1]:det_area[1] + det_area[3], det_area[0]:det_area[0] + det_area[2]]
             # resize the frame, convert it to grayscale, and blur it
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             gray = cv2.GaussianBlur(gray, (21, 21), 0)
@@ -145,8 +146,12 @@ def process_frame(cam):
             # det_area[0]==pixel_from_x; det_area[1]==pixel_from_y; det_area[2]==width; det_area[3]==height
             cv2.rectangle(frame, (det_area[0], det_area[1]), (det_area[0] + det_area[2], det_area[1] + det_area[3]),
                           (0, 0, 255), 2)
-
         if detections is not None:
+            if pi:
+                if not detections:
+                    GPIO.output(8,0)
+                else:
+                    GPIO.output(8,1)
             for d in detections:
                 # if cv2.contourArea(d) > 360:
                 # compute the bounding box for the contour, draw it on the frame
@@ -154,8 +159,7 @@ def process_frame(cam):
                 if not rectangle.empty():
                     rect = rectangle.get()
                     rectangle.put(rect)
-                    cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + w, y + h),
-                                  (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + rect[0] + w, y + rect[1]+ h), (0, 255, 0), 2)
 
         _, jpeg_frame = cv2.imencode('.jpg', frame)
         bytes_frame = jpeg_frame.tobytes()
@@ -164,6 +168,10 @@ def process_frame(cam):
 
 
 if __name__ == '__main__':
+    if pi:
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(8, GPIO.OUT)
+        GPIO.output(8,0)
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)
     first_frame = None
