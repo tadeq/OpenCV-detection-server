@@ -52,24 +52,24 @@ def surveillance():
 
 @app.route('/video_viewer', methods=['GET', 'POST'])
 def video_viewer():
-    global p
+    global p, clients
     if request.method == 'POST':
         json = request.get_json()
         mode = json['mode']
         if mode == "on":
+            clients += 1
             if p is None or not p.is_alive():
                 print("[INFO] starting process...")
-                p = Process(target=classify_frame, args=())
+                p = Process(target=classify_frame)
                 p.daemon = True
                 p.start()
-            return Response(process_frame(video_stream),
-                            mimetype='multipart/x-mixed-replace; boundary=frame')
         else:
-            p.terminate()
-            return '', 204
-    else:
-        return Response(process_frame(video_stream),
-                        mimetype='multipart/x-mixed-replace; boundary=frame')
+            clients -= 1
+            if not clients:
+                p.terminate()
+                return '', 204
+    return Response(process_frame(video_stream),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 def draw_area(cam):
@@ -113,7 +113,7 @@ def classify_frame():
             if first_frame is None:
                 first_frame = gray
                 continue
-            if len(frame) != len(first_frame):
+            if len(gray) != len(first_frame):
                 continue
             # compute the absolute difference between the current frame and first frame
             frame_delta = cv2.absdiff(first_frame, gray)
@@ -149,9 +149,9 @@ def process_frame(cam):
         if detections is not None:
             if pi:
                 if not detections:
-                    GPIO.output(8,0)
+                    GPIO.output(8, 0)
                 else:
-                    GPIO.output(8,1)
+                    GPIO.output(8, 1)
             for d in detections:
                 # if cv2.contourArea(d) > 360:
                 # compute the bounding box for the contour, draw it on the frame
@@ -159,7 +159,7 @@ def process_frame(cam):
                 if not rectangle.empty():
                     rect = rectangle.get()
                     rectangle.put(rect)
-                    cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + rect[0] + w, y + rect[1]+ h), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x + rect[0], y + rect[1]), (x + rect[0] + w, y + rect[1] + h), (0, 255, 0), 2)
 
         _, jpeg_frame = cv2.imencode('.jpg', frame)
         bytes_frame = jpeg_frame.tobytes()
@@ -171,12 +171,13 @@ if __name__ == '__main__':
     if pi:
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(8, GPIO.OUT)
-        GPIO.output(8,0)
+        GPIO.output(8, 0)
     input_queue = Queue(maxsize=1)
     output_queue = Queue(maxsize=1)
     first_frame = None
     detections = None
     p = None
+    clients = 0
     rectangle = Queue(maxsize=1)
     rectangle.put([0, 0, 0, 0])
 

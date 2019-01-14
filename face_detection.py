@@ -16,9 +16,10 @@ pi = False
 network = True
 
 
-def classify_frame_haar(input_queue, output_queue):
+def classify_frame_haar():
+    global detections
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    while True:        
+    while True:
         # check to see if there is a frame in our input queue
         if not input_queue.empty():
             frame = input_queue.get()
@@ -28,11 +29,12 @@ def classify_frame_haar(input_queue, output_queue):
             output_queue.put(detections)
 
 
-def classify_frame_net(input_queue, output_queue):
+def classify_frame_net():
+    global detections
     prototxt = "deploy.prototxt.txt"
     model = "res10_300x300_ssd_iter_140000.caffemodel"
     net = cv2.dnn.readNetFromCaffe(prototxt, model)
-    while True:        
+    while True:
         # check to see if there is a frame in our input queue
         if not input_queue.empty():
             frame = input_queue.get()
@@ -55,7 +57,8 @@ def index():
     return render_template('index.html')
 
 
-def process_frame(cam, input_queue, output_queue, detections):
+def process_frame(cam):
+    global detections
     while True:
         if pi:
             frame = cam.read()
@@ -107,18 +110,18 @@ def video_viewer():
                 # construct a child process *indepedent* from our main process of execution
                 print("[INFO] starting process...")
                 if network:
-                    p = Process(target=classify_frame_net, args=(input_queue, output_queue,))
+                    p = Process(target=classify_frame_net)
                 else:
-                    p = Process(target=classify_frame_haar, args=(input_queue, output_queue,))
+                    p = Process(target=classify_frame_haar)
                 p.daemon = True
                 p.start()
-            return Response(process_frame(video_stream, input_queue, output_queue, detections),
+            return Response(process_frame(video_stream),
                             mimetype='multipart/x-mixed-replace; boundary=frame')
         else:
             p.terminate()
             return '', 204
     else:
-        return Response(process_frame(video_stream, input_queue, output_queue, detections),
+        return Response(process_frame(video_stream),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
